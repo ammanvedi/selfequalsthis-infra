@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: quantified-self-api
+  name: qsapi
   labels:
     app: qsapi
   namespace: default
