@@ -8,7 +8,7 @@ metadata:
 spec:
   ports:
     - port: 80
-      targetPort: 3010
+      targetPort: 80
   selector:
     app: web
   type: ClusterIP
