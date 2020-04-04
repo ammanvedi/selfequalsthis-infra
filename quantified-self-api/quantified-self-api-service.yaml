@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: quantified-self-api
   labels:
-    app: authenticator
+    app: qsapi
   namespace: default
 spec:
   ports:
@@ -11,5 +11,5 @@ spec:
       targetPort: 3090
       protocol: TCP
   selector:
-    app: authenticator
+    app: qsapi
   type: ClusterIP
