@@ -1,0 +1,6 @@
+.idea
+credentials
+secrets/__generated__
+
+.embark.plan.log
+.embark.failure.log

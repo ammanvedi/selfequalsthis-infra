@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: web
+    spec:
+      containers:
+        - image: habuhomeimages/habuhome:web_v1
+          imagePullPolicy: IfNotPresent
+          name: web
+          ports:
+            - containerPort: 3010
+              protocol: TCP
+          resources: {}
+      imagePullSecrets:
+        - name: myregistrykey

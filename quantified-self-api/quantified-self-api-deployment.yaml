@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: authenticator
+  name: authenticator
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authenticator
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: authenticator
+    spec:
+      containers:
+        - image: habuhomeimages/habuhome:authenticator_v9.0.2
+          imagePullPolicy: IfNotPresent
+          name: authenticator
+          env:
+            - name: AUTH_SERVICE_SERVER_PORT
+              value: "3002"
+            - name: AUTH_SERVICE_PRIVATE_KEY_PATH
+              value: /var/keys/ssh-privatekey
+            - name: AUTH_SERVICE_PUBLIC_KEY_PATH
+              value: /var/keys/ssh-publickey
+            - name: AUTH_SERVICE_DATA_SERVICE_URL
+              value: http://hasurainternal/v1/graphql
+            - name: AUTH_SERVICE_DATA_SERVICE_SECRET_HEADER_NAME
+              value: x-hasura-admin-secret
+            - name: AUTH_SERVICE_PUBLIC_WEB_APP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: authsecrets
+                  key: publicwebendpoint
+            - name: AUTH_SERVICE_MAILER_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: authsecrets
+                  key: emailfrom
+            - name: AUTH_SERVICE_MAILER_FROM_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: authsecrets
+                  key: emailfromname
+            - name: AUTH_SERVICE_MAILER_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: authsecrets
+                  key: emailendpoint
+            - name: AUTH_SERVICE_MAILER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authsecrets
+                  key: emailapikey
+            - name: AUTH_SERVICE_DATA_SERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authsecrets
+                  key: adminsecret
+          ports:
+            - containerPort: 3002
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - mountPath: "/var/keys"
+              name: ssh-key-secret
+              readOnly: true
+      volumes:
+        - name: ssh-key-secret
+          secret:
+            secretName: ssh-key-secret
+      imagePullSecrets:
+        - name: myregistrykey

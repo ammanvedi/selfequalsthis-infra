@@ -1,0 +1,9 @@
+{
+  "readVersionCommand": "cat version.txt",
+  "writeVersionCommands": [
+    "printf \"%s\" \"{{version}}\" > version.txt"
+  ],
+  "preReleaseStart": [],
+  "postReleaseStart": [],
+  "postReleaseFinish": []
+}

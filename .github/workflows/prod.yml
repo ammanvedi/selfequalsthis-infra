@@ -1,0 +1,90 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Digital Ocean Kubernetes Test
+
+# Controls when the action will run. Triggers the workflow on push or pull request 
+# events but only for the master branch
+on:
+  push:
+    branches:
+      - 'release/**'
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  Kubernetes_Deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '10.x'
+
+    - name: Create Credentials Files
+      run: |
+        mkdir $GITHUB_WORKSPACE/credentials
+        mkdir $GITHUB_WORKSPACE/credentials/keys
+        printf "%s" "$JWT_PRIVATE_KEY" > $GITHUB_WORKSPACE/credentials/keys/jwt.key
+        printf "%s" "$JWT_PUBLIC_KEY" > $GITHUB_WORKSPACE/credentials/keys/jwt.key.pub
+        printf "%s" "$HASURA_ADMIN_SECRET" > $GITHUB_WORKSPACE/credentials/hasura-admin-secret.txt
+        printf "%s" "$POSTGRES_DB" > $GITHUB_WORKSPACE/credentials/postgres-db.txt
+        printf "%s" "$POSTGRES_PASSWORD" > $GITHUB_WORKSPACE/credentials/postgres-password.txt
+        printf "%s" "$POSTGRES_USER" > $GITHUB_WORKSPACE/credentials/postgres-user.txt
+        printf "%s" "$AUTH_SERVICE_PUBLIC_WEB_APP_ENDPOINT" > $GITHUB_WORKSPACE/credentials/public-web-endpoint.txt
+        printf "%s" "$AUTH_SERVICE_MAILER_FROM" > $GITHUB_WORKSPACE/credentials/auth-service-email-from.txt
+        printf "%s" "$AUTH_SERVICE_MAILER_FROM_NAME" > $GITHUB_WORKSPACE/credentials/auth-service-email-from-name.txt
+        printf "%s" "$AUTH_SERVICE_MAILER_ENDPOINT" > $GITHUB_WORKSPACE/credentials/auth-service-email-endpoint.txt
+        printf "%s" "$AUTH_SERVICE_MAILER_API_KEY" > $GITHUB_WORKSPACE/credentials/auth-service-email-api-key.txt
+      env:
+        JWT_PRIVATE_KEY: ${{secrets.JWT_PRIVATE_KEY}}
+        JWT_PUBLIC_KEY: ${{secrets.JWT_PUBLIC_KEY}}
+        HASURA_ADMIN_SECRET: ${{secrets.HASURA_ADMIN_SECRET}}
+        POSTGRES_DB: ${{secrets.POSTGRES_DB}}
+        POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD}}
+        POSTGRES_USER: ${{secrets.POSTGRES_USER}}
+        AUTH_SERVICE_PUBLIC_WEB_APP_ENDPOINT: ${{secrets.TEST_WEB_APP_ENDPOINT}}
+        AUTH_SERVICE_MAILER_FROM: ${{secrets.TEST_MAILER_FROM}}
+        AUTH_SERVICE_MAILER_FROM_NAME: ${{secrets.TEST_MAILER_FROM_NAME}}
+        AUTH_SERVICE_MAILER_ENDPOINT: ${{secrets.TEST_MAILER_ENDPOINT}}
+        AUTH_SERVICE_MAILER_API_KEY: ${{secrets.TEST_MAILER_API_KEY}}
+
+    - name: Save DigitalOcean kubeconfig
+      uses: digitalocean/action-doctl@master
+      env:
+        DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      with:
+        args: kubernetes cluster kubeconfig show habu-test > $GITHUB_WORKSPACE/.kubeconfig
+
+    - name: Allow Kubernetes to Pull Private Images
+      run: kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig create secret docker-registry myregistrykey --docker-server=$DOCKER_REGISTRY_SERVER --docker-username=$DOCKER_USERNAME --docker-password=$DOCKER_PASSWORD --docker-email=$DOCKER_EMAIL || echo "Secret Exists"
+      env:
+        DOCKER_REGISTRY_SERVER: ${{secrets.DOCKER_REGISTRY_SERVER}}
+        DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+        DOCKER_EMAIL: ${{secrets.DOCKER_EMAIL}}
+        DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+
+    - name: Run Kube Deploy
+      run: |
+        node $GITHUB_WORKSPACE/scripts/secret-generator.js
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig create secret generic ssh-key-secret --from-file=ssh-privatekey=$GITHUB_WORKSPACE/credentials/keys/jwt.key --from-file=ssh-publickey=$GITHUB_WORKSPACE/credentials/keys/jwt.key.pub || echo "Secret Exists"
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/ingress/vendor/nginx/mandatory.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/ingress/vendor/nginx/cloud-generic.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/ingress/ingress.test.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/tls/namespace.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply --validate=false -f $GITHUB_WORKSPACE/tls/vendor/cert-manager/cert-manager.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/tls/prod-issuer.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/secrets/__generated__/auth-secrets.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/secrets/__generated__/hasura-secrets.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/secrets/__generated__/postgres-secrets.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/postgres/postgres-storage.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/postgres/postgres-deployment.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/postgres/postgres-service.yaml --force
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/hasura/hasura-deployment.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/hasura/hasura-service.yaml --force
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/web/web-deployment.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/web/web-service.yaml --force
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/authenticator/authenticator-deployment.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/authenticator/authenticator-service.yaml --force
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/gateway/gateway-deployment.yaml
+        kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig apply -f $GITHUB_WORKSPACE/gateway/gateway-service.yaml --force
