@@ -26,7 +26,7 @@ jobs:
       env:
         DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       with:
-        args: kubernetes cluster kubeconfig show selfequalsthis > $GITHUB_WORKSPACE/.kubeconfig
+        args: kubernetes cluster kubeconfig show selfequalthis > $GITHUB_WORKSPACE/.kubeconfig
 
     - name: Allow Kubernetes to Pull Private Images
       run: kubectl --kubeconfig=$GITHUB_WORKSPACE/.kubeconfig create secret docker-registry myregistrykey --docker-server=$DOCKER_REGISTRY_SERVER --docker-username=$DOCKER_USERNAME --docker-password=$DOCKER_PASSWORD --docker-email=$DOCKER_EMAIL || echo "Secret Exists"
